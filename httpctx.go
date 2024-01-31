@@ -69,10 +69,10 @@ func ServeTLS(ctx context.Context, srv *http.Server, ln net.Listener, certFile, 
 }
 
 func start(ctx context.Context, cfg config, srv *http.Server, runFunc func() error) error {
-	errc := make(chan error)
+	errc := make(chan error, 1)
 
-	go func() {
-		<-ctx.Done()
+	context.AfterFunc(ctx, func() {
+		defer close(errc)
 
 		timeout := context.Background()
 		if cfg.shutdownTimeout > 0 {
@@ -83,7 +83,7 @@ func start(ctx context.Context, cfg config, srv *http.Server, runFunc func() err
 
 		cfg.beforeShutdown(cfg.shutdownTimeout)
 		errc <- srv.Shutdown(timeout)
-	}()
+	})
 
 	if err := runFunc(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
